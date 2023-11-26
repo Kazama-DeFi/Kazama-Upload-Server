@@ -4,9 +4,13 @@ const cors = require("cors");
 const multer = require('multer');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
+const fs = require('fs');
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
+
+// Kazama mongoose api user schema
+const User = require('./models/userModel');
 
 // Connect to kazama mongoose api
 const KAZAMA_MONGOOSE_CONNECTION_STRING = STRING;
@@ -46,11 +50,43 @@ const storage = multer.diskStorage({
 
 const imageUpload = multer({storage: storage})
 
-app.post('/image-upload', imageUpload.array("kazama-user-avatar"), (req, res) => {
-  console.log('POST request received to /image-upload.');
-  console.log('Axios POST body: ', req.body);
-  res.send('POST request recieved on server to /image-upload.');
-})
+app.post('/image-upload', imageUpload.array("kazama-user-avatar"), async (req, res) => {
+    console.log('POST request received to /image-upload.');
+    console.log('Axios POST body: ', req.body);
+  
+    const address = req.body.address;
+    const newImageFilename = req.files[0].filename;
+  
+    try {
+      // Retrieve the user from the kazama mongoose server
+      const user = await User.findOne({ address: address });
+  
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+  
+      // Check if the user has a custom avatar (not the default URL)
+      if (user.avatarImage && !user.avatarImage.startsWith('https://assets.kazamaswap.finance/profiles/avatars/default.jpg')) {
+        // User has a custom avatar URL, delete the old image file
+        const oldImageFilename = user.avatarImage.split('/').pop();
+        const oldImagePath = `${imageUploadPath}/${oldImageFilename}`;
+        
+        // Check if the old image file exists before attempting to delete it
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+  
+      // Update the avatarImage URL with the new image filename
+      user.avatarImage = `https://assets.kazamaswap.finance/profiles/avatars/${newImageFilename}`;
+      await user.save();
+  
+      res.send('Image uploaded and user profile updated.');
+    } catch (error) {
+      console.error('Error uploading image and updating user profile:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
 
 const port = 4000;
 app.listen(port, process.env.IP, function(){
