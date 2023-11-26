@@ -76,6 +76,15 @@ app.post('/image-upload', imageUpload.array("kazama-user-avatar"), async (req, r
           fs.unlinkSync(oldImagePath);
         }
       }
+
+    // Validate the file type (server-side validation)
+    const allowedFileTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    const newImageType = req.files[0].mimetype;
+    
+    if (!allowedFileTypes.includes(newImageType)) {
+      console.log('Denied: Not jpg, png or gif')
+      return res.status(400).json({ error: 'Invalid file type. Please upload a jpg, png, or gif file.' });
+    }
   
       // Update the avatarImage URL with the new image filename
       user.avatarImage = `https://assets.kazamaswap.finance/profiles/avatars/${newImageFilename}`;
